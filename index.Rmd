@@ -1,0 +1,87 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Lotte Sluyser"
+date: "16 september 2017"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache=TRUE)
+library(caret)
+library(randomForest)
+```
+
+# Introduction to the project
+In this project the goal was to use data from accelerometers on the belt, forearm, arm and dumbell to quantify how well 6 participants do a particular activity. Participants were asked to perform barbell lifts correctly and incorrectly in 5 different ways. Goal was to predict the manner in which they did the exercise, the "classe" variable in the training set. This report describes how the model was built, how cross validation was used and the expected out of sample error. The model was used to predict 20 different test cases. 
+
+##Loading the data
+```{r}
+fileUrl<- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+download.file(fileUrl,destfile="train.csv", method="curl")
+training = read.csv("~/Desktop/coursera/Datascience_cursus_8/train.csv")
+fileUrl2<- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+download.file(fileUrl2,destfile="test.csv", method="curl")
+testing = read.csv("~/Desktop/coursera/Datascience_cursus_8/test.csv")
+dim(training);dim(testing)
+```
+##Data processing
+
+It is checked how many missing values (na's) there are per column:
+```{R}
+sapply(training, function(x) sum(is.na(x)))
+```
+There are many columns with 19216 na's. These are removed.
+```{R}
+a<-Filter(function(x) sum(is.na(x)) < 19216, training)
+b<-Filter(function(x) sum(is.na(x)) < 19216, testing)
+```
+NearZerovar is applied to remove predictors with only 1 value
+```{R}
+a_nzv<- nearZeroVar(a)
+new_a<- a[,-a_nzv]
+b_nzv<- nearZeroVar(b)
+new_b<- b[,-b_nzv]
+dim(new_a);dim(new_b)
+```
+There are 59 variables left. The first 6 variables are deleted as they are descriptive and no measures
+```{R}
+trainnew<-new_a[,-c(1:6)]
+testnew <-new_b[,-c(1:6)]
+```
+
+The validation set is built by splitting off 30% of the trainingset:
+```{R}
+inTrain<- createDataPartition(y=trainnew$classe,p=0.7,list=FALSE)
+trainset<- trainnew[inTrain,]
+validationset<- trainnew[-inTrain,]
+```
+## Building the model
+
+A random forest model is built:
+```{R} 
+set.seed(7)
+training_rf <- randomForest(x=trainset[,1:(ncol(trainset)-1)], y=trainset[,"classe"], importance=TRUE, do.trace=100)
+```
+OOB = 0.50%
+Accuracy=1-OOB=99.5%
+```{R}
+plot(training_rf)
+```
+
+##The model is tested on the validation set:
+```{R}
+pred<-predict(training_rf,validationset);validationset$predRight<-pred==validationset$classe
+confusionMatrix(pred, validationset$classe)
+```
+Accuracy : 0.9968 
+oob=1-0.9968=0.0032
+
+## Use prediction model to predict 20 testcases
+```{R}
+pred2<-predict(training_rf,testnew)
+pred2
+```
+
